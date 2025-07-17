@@ -37,6 +37,7 @@ class FunctionService
         ): void {
             $callback = $update->getCallbackQuery();
             
+            
             // 1) Javob yozish tugmasi bosildi
             if ($callback) {
                 $data = $callback->getData();
@@ -88,7 +89,10 @@ class FunctionService
             // Qolgan holatlar: /admin, kutayotganlar va boshqalar
             if ($msg && $msg->getText()) {
                 $text = $msg->getText();
-                
+                if ($msg === '/admin') {
+                    TelegramStepService::sendMessage($adminId, 'Admin menyu:', self::adminMainMenu());
+                    return;
+                }
                 if ($text === "/cancel") {
                     AdminReplyState::where('admin_id', $adminId)->delete();
                     TelegramStepService::sendMessage($adminId, "❌ Bekor qilindi.");
@@ -96,46 +100,46 @@ class FunctionService
                 }
                 
                 if ($text === "🕓 Kutayotgan murojaatlar") {
-                   $pending = Appeal::where("status", "pending")
-                ->latest()
-                ->take(10)
-                ->get();
-
-            if ($pending->isEmpty()) {
-                TelegramStepService::sendMessage(
-                    $adminId,
-                    "Hozircha javobsiz murojaat yo‘q."
-                );
-                return;
-            }
-
-            foreach ($pending as $app) {
-                $response = TelegramStepService::sendMessageWithResponse(
-                    $adminId,
-                    "#{$app->id} – <i>{$app->body}</i>",
-                    replyMarkup: [
-                        "inline_keyboard" => [
-                            [
-                                [
-                                    "text" => "✉️ Javob yozish",
-                                    "callback_data" => "reply_{$app->id}_{$app->user->telegram_id}",
+                    $pending = Appeal::where("status", "pending")
+                    ->latest()
+                    ->take(10)
+                    ->get();
+                    
+                    if ($pending->isEmpty()) {
+                        TelegramStepService::sendMessage(
+                            $adminId,
+                            "Hozircha javobsiz murojaat yo‘q."
+                        );
+                        return;
+                    }
+                    
+                    foreach ($pending as $app) {
+                        $response = TelegramStepService::sendMessageWithResponse(
+                            $adminId,
+                            "#{$app->id} – <i>{$app->body}</i>",
+                            replyMarkup: [
+                                "inline_keyboard" => [
+                                    [
+                                        [
+                                            "text" => "✉️ Javob yozish",
+                                            "callback_data" => "reply_{$app->id}_{$app->user->telegram_id}",
+                                        ],
+                                    ],
                                 ],
                             ],
-                        ],
-                    ],
-                    parseMode: "HTML"
-                );
-
-                $messageId = data_get($response, "result.message_id");
-
-                if ($messageId) {
-                    AdminNotification::create([
-                        "appeal_id" => $app->id,
-                        "admin_id" => $adminId,
-                        "message_id" => $messageId,
-                    ]);
-                }
-            }
+                            parseMode: "HTML"
+                        );
+                        
+                        $messageId = data_get($response, "result.message_id");
+                        
+                        if ($messageId) {
+                            AdminNotification::create([
+                                "appeal_id" => $app->id,
+                                "admin_id" => $adminId,
+                                "message_id" => $messageId,
+                            ]);
+                        }
+                    }
                 }
                 
                 // Javob yozish holati
