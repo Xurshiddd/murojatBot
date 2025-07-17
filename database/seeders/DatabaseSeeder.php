@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             'full_name' => 'Admin',
         ]);
         User::create([
-            'telegram_id' => '898426931',
+            'telegram_id' => '51372095',
             'language' => "O'zbekcha",
             'full_name' => 'Admin',
         ]);
