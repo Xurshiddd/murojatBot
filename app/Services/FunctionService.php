@@ -89,7 +89,7 @@ class FunctionService
             // Qolgan holatlar: /admin, kutayotganlar va boshqalar
             if ($msg && $msg->getText()) {
                 $text = $msg->getText();
-                if ($msg === '/admin') {
+                if ($text === '/admin') {
                     TelegramStepService::sendMessage($adminId, 'Admin menyu:', self::adminMainMenu());
                     return;
                 }
