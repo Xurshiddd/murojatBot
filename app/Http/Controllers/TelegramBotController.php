@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Services\FunctionService;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use App\Models\TelegramUserStep;
 
 class TelegramBotController extends Controller
 {
@@ -13,15 +14,10 @@ class TelegramBotController extends Controller
     public function __construct(private FunctionService $functionService) {
         $this->telegram = new \Telegram\Bot\Api(env('TELEGRAM_BOT_TOKEN'));
     }
-    function is_admin(int $telegramId): bool
-    {
-        return in_array($telegramId, config('telegram.admins'), true);
-    }
     
     public function handleWebhook(Request $request)
     {
         $update = $this->telegram->getWebhookUpdate();
-        
         // 1) Callback bormi?
         $callback = $update->getCallbackQuery();
         
@@ -30,7 +26,6 @@ class TelegramBotController extends Controller
         if (!$message) {
             return;    // media/foto only
         }
-        
         // --- TO‘G‘RI ID LAR ---
         $fromId = $callback?->getFrom()->getId()           // callback bo‘lsa admin foydalanuvchi
         ?? $message->getFrom()->getId();           // oddiy xabar bo‘lsa
@@ -40,7 +35,6 @@ class TelegramBotController extends Controller
         $text = $message->getText()
         ?? $message->getContact()?->getPhoneNumber()
         ?? $callback?->getData();
-        /* ===========  ADMIN  /  USER  ========== */
         if (is_admin($fromId)) {                   // ← endi to‘g‘ri tekshiradi
             $this->functionService->adminFunc($chatId, $message, $update); // $chatId ≈ $fromId (private chat)
             
@@ -53,12 +47,23 @@ class TelegramBotController extends Controller
             return;
         }
         
-        /* -------- FOYDALANUVCHI OQIMI -------- */
         if ($text === '/start') {
             return $this->functionService->startFunc($chatId);
         }
         if (in_array($text, ["O'zbekcha", 'Русский'])) {
-            User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text]);
+            if(User::where('telegram_id', $chatId)->exists()){
+                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text]);
+                TelegramUserStep::updateOrCreate(
+                ["telegram_id" => $fromId],
+                ["step" => 'main_menu']
+            );
+            }else {
+                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text]);
+                TelegramUserStep::updateOrCreate(
+                ["telegram_id" => $fromId],
+                ["step" => 'first']
+            );
+            }
         }
         $this->functionService->registerFunc($chatId, $text);
     }

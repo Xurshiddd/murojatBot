@@ -30,13 +30,67 @@ class TelegramStepService
         public static function processStep($telegramId, $text, $step)
         {
             $user = User::firstOrCreate(["telegram_id" => $telegramId]);
-            
+            if($user->language == "O'zbekcha"){
+                $lang = [
+                    "full_name" => "Ism familyangizni to'liq yozing:",
+                    "region" => "Viloyatingizni tanlang:",
+                    "address" => "Manzilingizni kiriting:",
+                    "birth" => "Tug‘ilgan yilingizni kiriting (YYYY-MM-DD):",
+                    "birth_date" => "❗️ Tug‘ilgan sanani to‘g‘ri kiriting. Masalan: 2000-01-25",
+                    "phone" => "✅ Ro'yxatdan o'tdingiz!",
+                    "man" => "Asosiy menyu",
+                    "main_menu" => [
+                        "yangi" => "📤 Yangi murojaat yuborish",
+                        "new_appeal" => "Murojaatingizni yuboring:",
+                        "myMr" => "📋 Mening murojaatlarim",
+                        "settings" => "⚙️ Sozlamalar",
+                        "no" => "Iltimos menyudan tanlang:",
+                        "yes" => "✅ Murojaatingiz qabul qilindi!",
+                        "null" => "Sizda hali murojaatlar yo‘q.",
+                        "lang_ch" => "🌐 Tilni o‘zgartirish",
+                        "til" => "Tilni tanlang:",
+                        "back" => "◀️ Orqaga",
+                        "back_menu" => "Menyuga qaytdingiz:",
+                        "new_lang" => "Til yangilandi ✅",
+                    ],
+                    "please" => "Iltimos menyudan tini tanlang",
+                    "no_murojat" => "Sizda hali murojaatlar yo‘q.",
+                    "mymr" => "🗂 Mening murojaatlarim (so‘nggi 5):\n\n",
+                ];
+            }else{
+                $lang = [
+                    "full_name" => "Введите ваше полное имя:",
+                    "region" => "Выберите вашу область:",
+                    "address" => "Введите ваш адрес:",
+                    "birth" => "Введите вашу дату рождения (ГГГГ-ММ-ДД):",
+                    "birth_date" => "❗️ Пожалуйста, введите правильную дату рождения. Например: 2000-01-25",
+                    "phone" => "✅ Вы успешно зарегистрировались!",
+                    "man" => "Главное меню",
+                    "main_menu" => [
+                        "yangi" => "📤 Отправить новое обращение",
+                        "new_appeal" => "Отправьте ваше обращение:",
+                        "myMr" => "📋 Мои обращения",
+                        "settings" => "⚙️ Настройки:",
+                        "no" => "Пожалуйста, выберите из меню:",
+                        "yes" => "✅ Ваше обращение принято!",
+                        "null" => "У вас пока нет обращений.",
+                        "lang_ch" => "🌐 Изменить язык",
+                        "til" => "Выберите язык:",
+                        "back" => "◀️ Назад",
+                        "back_menu" => "Вы вернулись в меню:",
+                        "new_lang" => "Язык успешно изменён ✅",
+                    ],
+                    "please" => "Пожалуйста, выберите язык из меню.",
+                    "no_murojat" => "У вас пока нет обращений.",
+                    "mymr" => "🗂 Мои обращения (последние 5):\n\n",
+                ];
+            }
             switch ($step) {
                 case "first":
                     self::setStep($telegramId, "full_name");
                     self::sendMessage(
                         $telegramId,
-                        "Ism familyangizni to'liq yozing:"
+                        $lang['full_name']
                     );
                     break;
                     case "full_name":
@@ -46,7 +100,7 @@ class TelegramStepService
                         self::setStep($telegramId, "region");
                         
                         // Klaviaturani jo‘natamiz
-                        self::sendMessage($telegramId, "Viloyatingizni tanlang:", [
+                        self::sendMessage($telegramId, $lang['region'], [
                             "keyboard" => [
                                 [
                                     ["text" => "Toshkent shahar"],
@@ -71,7 +125,7 @@ class TelegramStepService
                             $user->region = $text;
                             $user->save();
                             self::setStep($telegramId, "address");
-                            self::sendMessage($telegramId, "Manzilingizni kiriting:");
+                            self::sendMessage($telegramId, $lang['address']);
                             break;
                             
                             case "address":
@@ -80,7 +134,7 @@ class TelegramStepService
                                 self::setStep($telegramId, "birth_date");
                                 self::sendMessage(
                                     $telegramId,
-                                    "Tug‘ilgan yilingizni kiriting (YYYY-MM-DD):"
+                                    $lang['birth']
                                 );
                                 break;
                                 
@@ -89,7 +143,7 @@ class TelegramStepService
                                     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $text)) {
                                         self::sendMessage(
                                             $telegramId,
-                                            "❗️ Tug‘ilgan sanani to‘g‘ri kiriting. Masalan: 2000-01-25"
+                                           $lang['birth_date']
                                         );
                                         return;
                                     }
@@ -106,8 +160,8 @@ class TelegramStepService
                                         self::setStep($telegramId, "done");
                                         self::sendMessage(
                                             $telegramId,
-                                            "✅ Ro'yxatdan o'tdingiz!",
-                                            self::mainMenu()
+                                            $lang['phone'],
+                                            self::mainMenu($user->language)
                                         );
                                         self::setStep($telegramId, "main_menu");
                                         break;
@@ -115,31 +169,31 @@ class TelegramStepService
                                         case "done": // ro‘yxat tugadi → asosiy menyu
                                             self::sendMessage(
                                                 $telegramId,
-                                                "📋 Asosiy menyu:",
-                                                self::mainMenu()
+                                               $lang['man'],
+                                                self::mainMenu($user->language)
                                             );
                                             self::setStep($telegramId, "main_menu");
                                             break;
                                             
                                             /* ---------- ASOSIY MENYU ﻿---------- */
                                             case "main_menu":
-                                                if ($text === "📤 Yangi murojaat yuborish") {
+                                                if ($text === $lang["main_menu"]['yangi']) {
                                                     self::setStep($telegramId, "new_appeal");
-                                                    self::sendMessage($telegramId, "Murojaatingizni yuboring:");
-                                                } elseif ($text === "📋 Mening murojaatlarim") {
+                                                    self::sendMessage($telegramId, $lang['main_menu']['new_appeal']);
+                                                } elseif ($text === $lang["main_menu"]["myMr"]) {
                                                     self::listAppeals($telegramId, $user);
-                                                } elseif ($text === "⚙️ Sozlamalar") {
+                                                } elseif ($text === $lang['main_menu']['settings']) {
                                                     self::setStep($telegramId, "settings");
                                                     self::sendMessage(
                                                         $telegramId,
-                                                        "⚙️ Sozlamalar:",
+                                                        $lang['main_menu']['settings'],
                                                         self::settingsMenu()
                                                     );
                                                 } else {
                                                     self::sendMessage(
                                                         $telegramId,
-                                                        "Iltimos menyudan tanlang:",
-                                                        self::mainMenu()
+                                                        $lang['main_menu']['no'],
+                                                        self::mainMenu($user->language)
                                                     );
                                                 }
                                                 break;
@@ -154,8 +208,8 @@ class TelegramStepService
                                                     FunctionService::notifyAdminsOfAppeal($user, $appeal);
                                                     self::sendMessage(
                                                         $telegramId,
-                                                        "✅ Murojaatingiz qabul qilindi!",
-                                                        self::mainMenu()
+                                                        $lang['main_menu']['yes'],
+                                                        self::mainMenu($user->language)
                                                     );
                                                     
                                                     
@@ -164,26 +218,26 @@ class TelegramStepService
                                                     
                                                     /* ---------- SOZLAMALAR ﻿---------- */
                                                     case "settings":
-                                                        if ($text === "🌐 Tilni o‘zgartirish") {
+                                                        if ($text === $lang['main_menu']['lang_ch']) {
                                                             self::sendMessage($telegramId, "Tilni tanlang:", [
                                                                 "keyboard" => [
                                                                     [["text" => "O'zbekcha"], ["text" => "Русский"]],
-                                                                    [["text" => "◀️ Orqaga"]],
+                                                                    [["text" =>$lang['main_menu']['back']]],
                                                                 ],
                                                                 "resize_keyboard" => true,
                                                             ]);
                                                             self::setStep($telegramId, "lang_change");
-                                                        } elseif ($text === "◀️ Orqaga") {
+                                                        } elseif ($text === $lang['main_menu']['back']) {
                                                             self::sendMessage(
                                                                 $telegramId,
-                                                                "Menyuga qaytdingiz:",
-                                                                self::mainMenu()
+                                                                $lang['main_menu']['back_menu'],
+                                                                self::mainMenu($user->language)
                                                             );
                                                             self::setStep($telegramId, "main_menu");
                                                         } else {
                                                             self::sendMessage(
                                                                 $telegramId,
-                                                                "Iltimos variantni tanlang:",
+                                                                $lang['main_menu']['no'],
                                                                 self::settingsMenu()
                                                             );
                                                         }
@@ -195,14 +249,14 @@ class TelegramStepService
                                                                 $user->save();
                                                                 self::sendMessage(
                                                                     $telegramId,
-                                                                    "Til yangilandi ✅",
+                                                                    $lang['main_menu']['new_lang'],
                                                                     self::settingsMenu()
                                                                 );
                                                                 self::setStep($telegramId, "settings");
                                                             } else {
                                                                 self::sendMessage(
                                                                     $telegramId,
-                                                                    "Iltimos tilni menyudan tanlang."
+                                                                    $lang['please']
                                                                 );
                                                             }
                                                             break;
@@ -280,7 +334,7 @@ class TelegramStepService
                                                                     self::sendMessage(
                                                                         $chatId,
                                                                         "Sizda hali murojaatlar yo‘q.",
-                                                                        self::mainMenu()
+                                                                        self::mainMenu($user->language)
                                                                     );
                                                                     return;
                                                                 }
@@ -296,7 +350,7 @@ class TelegramStepService
                                                                     $app->created_at->format("d.m.Y H:i") .
                                                                     "\n\n";
                                                                 }
-                                                                self::sendMessage($chatId, $text, self::mainMenu());
+                                                                self::sendMessage($chatId, $text, self::mainMenu($user->language));
                                                             }
                                                             public static function sendMessageWithResponse($chatId, $text, $replyMarkup = null, $parseMode = null)
                                                             {
@@ -329,7 +383,7 @@ class TelegramStepService
                                                             }
                                                             public static function request(string $method, array $params = []): ?array
                                                             {
-                                                                $token = config('services.telegram.bot_token'); // .env fayldan TOKEN oladi
+                                                                $token = env('TELEGRAM_BOT_TOKEN'); // .env fayldan TOKEN oladi
                                                                 $url = "https://api.telegram.org/bot{$token}/{$method}";
                                                                 
                                                                 $response = Http::post($url, $params);
@@ -337,8 +391,6 @@ class TelegramStepService
                                                                 if ($response->successful()) {
                                                                     return $response->json();
                                                                 }
-                                                                
-                                                                \Log::error("Telegram API error: " . $response->body());
                                                                 return null;
                                                             }
                                                             

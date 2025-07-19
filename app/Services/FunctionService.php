@@ -12,7 +12,7 @@ class FunctionService
 {
     public function startFunc($chatId)
     {
-        return Telegram::sendMessage([
+        Telegram::sendMessage([
             "chat_id" => $chatId,
             "text" => "Iltimos tilni tanlang",
             "reply_markup" => json_encode([
@@ -41,10 +41,8 @@ class FunctionService
             // 1) Javob yozish tugmasi bosildi
             if ($callback) {
                 $data = $callback->getData();
-                \Log::info("Callback data", [$data]);
                 
                 if (preg_match('/^reply_(\d+)_(\d+)$/', $data, $m)) {
-                    \Log::info("Regex match:", $m);
                     [$_, $appealId, $userTgId] = $m;
                     
                     $adminId = $callback->getFrom()->getId();
@@ -145,7 +143,7 @@ class FunctionService
                 // Javob yozish holati
                 $state = AdminReplyState::where("admin_id", $adminId)->first();
                 if ($state) {
-                    $this->forwardToUser($msg, $state->user_id);
+                    $this->forwardToUser($msg, $state->user_id, $callback, $msg->getCaption());
                     $this->finalizeReply($state->appeal_id);
                     $state->delete();
                     TelegramStepService::sendMessage($adminId, "✅ Yuborildi.");
@@ -155,113 +153,133 @@ class FunctionService
         }
         
         
-        /* ---------- yordamchi ---------- */
         private function forwardToUser(
             \Telegram\Bot\Objects\Message $msg,
-            int $toUserId
+            int $toUserId,
+            $callback,
+            ?string $caption = null
             ): void {
-                $fromChat = $msg->getChat()->getId();
-                $messageId = $msg->getMessageId();
-                
-                // Fayl yoki matn – hammasini copyMessage bilan yuborish:
-                Http::post(
-                    "https://api.telegram.org/bot" .
-                    env("TELEGRAM_BOT_TOKEN") .
-                    "/copyMessage",
-                    [
+                try {
+                    $fromChat = $msg->getChat()->getId();
+                    $messageId = $msg->getMessageId();
+                    
+                    if (!$msg->getText() && !$msg->getCaption()) {
+                        \Log::info("asdasdas",["asdas"=>"sdas"]);
+                        
+                        return;
+                    }
+                     \Log::info("asd",["asdas"=>"sdas"]);
+                    $customTextOrCaption = $msg->getText() ?? $caption;
+                    
+                    $data = [
                         "chat_id" => $toUserId,
                         "from_chat_id" => $fromChat,
                         "message_id" => $messageId,
-                        "caption" => $msg->getCaption(), // optional
                         "parse_mode" => "HTML",
-                        ]
-                    );
-                }
-                private function finalizeReply(int $appealId): void
-                {
-                    $appeal = Appeal::find($appealId);
+                    ];
                     
-                    // 1) Statusni yangilaymiz
-                    $appeal->update([
-                        "status" => "answered",
-                        "answered_at" => now(),
+                    if ($customTextOrCaption) {
+                        $data['caption'] = $customTextOrCaption;
+                    }
+                    
+                    Http::post("https://api.telegram.org/bot" . env("TELEGRAM_BOT_TOKEN") . "/copyMessage", $data);
+                    
+                } catch (\Throwable $e) {
+                    Telegram::answerCallbackQuery([
+                        'callback_query_id' => $callback->getId(),
+                        'text' => "Xabarni yuborishda xatolik yuz berdi",
+                        'show_alert' => true,
                     ]);
-                    $notifications = AdminNotification::where(
-                        "appeal_id",
-                        $appealId
-                        )->get();
-                        // 2) Admin notifications
-                        foreach ($notifications as $n) {
-                            Http::post(
-                                "https://api.telegram.org/bot" .
-                                env("TELEGRAM_BOT_TOKEN") .
-                                "/editMessageReplyMarkup",
-                                [
-                                    "chat_id" => $n->admin_id,
-                                    "message_id" => $n->message_id,
-                                    "reply_markup" => json_encode(["inline_keyboard" => []]),
-                                    ]
-                                );
-                                
-                                // --- (ixtiyoriy) Matnni yangilash ---
-                                // Http::post("https://api.telegram.org/bot".env('TELEGRAM_BOT_TOKEN')."/editMessageText", [
-                                //     'chat_id'    => $n->admin_id,
-                                //     'message_id' => $n->message_id,
-                                //     'text'       => "✅ Javob berildi (#{$appeal->id})",
-                                // ]);
-                            }
+                    \Log::error("Telegram xatolik: " . $e->getMessage());
+                }
+            }
+            
+            
+            private function finalizeReply(int $appealId): void
+            {
+                $appeal = Appeal::find($appealId);
+                
+                // 1) Statusni yangilaymiz
+                $appeal->update([
+                    "status" => "answered",
+                    "answered_at" => now(),
+                ]);
+                $notifications = AdminNotification::where(
+                    "appeal_id",
+                    $appealId
+                    )->get();
+                    // 2) Admin notifications
+                    foreach ($notifications as $n) {
+                        Http::post(
+                            "https://api.telegram.org/bot" .
+                            env("TELEGRAM_BOT_TOKEN") .
+                            "/editMessageReplyMarkup",
+                            [
+                                "chat_id" => $n->admin_id,
+                                "message_id" => $n->message_id,
+                                "reply_markup" => json_encode(["inline_keyboard" => []]),
+                                ]
+                            );
                             
-                            // 3) Istasangiz, AdminNotification yozuvlarini o‘chirib tashlashingiz mumkin:
-                                // AdminNotification::where('appeal_id', $appealId)->delete();
-                            }
-                            
-                            protected static function adminMainMenu(): array
-                            {
-                                return [
-                                    "keyboard" => [[["text" => "🕓 Kutayotgan murojaatlar"]]],
-                                    "resize_keyboard" => true,
-                                ];
-                            }
-                            public static function notifyAdminsOfAppeal(
-                                User $user,
-                                Appeal $appeal
-                                ): void {
-                                    foreach (config("telegram.admins") as $adminId) {
-                                        $response = Http::post(
-                                            "https://api.telegram.org/bot" .
-                                            env("TELEGRAM_BOT_TOKEN") .
-                                            "/sendMessage",
-                                            [
-                                                "chat_id" => $adminId,
-                                                "text" => "🆕 Yangi murojaat #{$appeal->id}\n{$user->full_name} (@{$user->telegram_id})\n\n<i>{$appeal->body}</i>",
-                                                "parse_mode" => "HTML",
-                                                "reply_markup" => json_encode(
-                                                    [
-                                                        "inline_keyboard" => [
+                            // --- (ixtiyoriy) Matnni yangilash ---
+                            // Http::post("https://api.telegram.org/bot".env('TELEGRAM_BOT_TOKEN')."/editMessageText", [
+                            //     'chat_id'    => $n->admin_id,
+                            //     'message_id' => $n->message_id,
+                            //     'text'       => "✅ Javob berildi (#{$appeal->id})",
+                            // ]);
+                        }
+                        
+                        // 3) Istasangiz, AdminNotification yozuvlarini o‘chirib tashlashingiz mumkin:
+                            // AdminNotification::where('appeal_id', $appealId)->delete();
+                        }
+                        
+                        protected static function adminMainMenu(): array
+                        {
+                            return [
+                                "keyboard" => [[["text" => "🕓 Kutayotgan murojaatlar"]]],
+                                "resize_keyboard" => true,
+                            ];
+                        }
+                        public static function notifyAdminsOfAppeal(
+                            User $user,
+                            Appeal $appeal
+                            ): void {
+                                foreach (config("telegram.admins") as $adminId) {
+                                    $response = Http::post(
+                                        "https://api.telegram.org/bot" .
+                                        env("TELEGRAM_BOT_TOKEN") .
+                                        "/sendMessage",
+                                        [
+                                            "chat_id" => $adminId,
+                                            "text" => "🆕 Yangi murojaat #{$appeal->id}\n{$user->full_name} (@{$user->telegram_id})\n\n<i>{$appeal->body}</i>",
+                                            "parse_mode" => "HTML",
+                                            "reply_markup" => json_encode(
+                                                [
+                                                    "inline_keyboard" => [
+                                                        [
                                                             [
-                                                                [
-                                                                    "text" => "✉️ Javob yozish",
-                                                                    "callback_data" => "reply_{$appeal->id}_{$user->telegram_id}",
-                                                                ],
+                                                                "text" => "✉️ Javob yozish",
+                                                                "callback_data" => "reply_{$appeal->id}_{$user->telegram_id}",
                                                             ],
                                                         ],
                                                     ],
-                                                    JSON_UNESCAPED_UNICODE
-                                                ),
-                                                ]
-                                            );
-                                            // dd($response);
-                                            // 3) Javobdan message_id ni aniqlaymiz (200 OK bo‘lsa)
-                                            $messageId = data_get($response->json(), "result.message_id");
-                                            
-                                            if ($messageId) {
-                                                AdminNotification::create([
-                                                    "appeal_id" => $appeal->id,
-                                                    "admin_id" => $adminId,
-                                                    "message_id" => $messageId,
-                                                ]);
-                                            }
+                                                ],
+                                                JSON_UNESCAPED_UNICODE
+                                            ),
+                                            ]
+                                        );
+                                        // dd($response);
+                                        // 3) Javobdan message_id ni aniqlaymiz (200 OK bo‘lsa)
+                                        $messageId = data_get($response->json(), "result.message_id");
+                                        
+                                        if ($messageId) {
+                                            AdminNotification::create([
+                                                "appeal_id" => $appeal->id,
+                                                "admin_id" => $adminId,
+                                                "message_id" => $messageId,
+                                            ]);
                                         }
                                     }
                                 }
-                                
+                            }
+                            

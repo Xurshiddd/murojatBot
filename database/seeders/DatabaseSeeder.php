@@ -14,19 +14,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // User::factory(10)->create();
-
-        User::create([
-            'telegram_id' => '546980644',
-            'language' => "O'zbekcha",
-            'full_name' => 'Admin',
-        ]);
         User::create([
             'telegram_id' => '898426931',
             'language' => "O'zbekcha",
             'full_name' => 'Admin',
         ]);
         User::create([
-            'telegram_id' => '51372095',
+            'telegram_id' => '7972797234',
             'language' => "O'zbekcha",
             'full_name' => 'Admin',
         ]);

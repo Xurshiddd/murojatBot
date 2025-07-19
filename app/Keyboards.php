@@ -4,8 +4,9 @@ namespace App;
 
 trait Keyboards
 {
-    protected static function mainMenu(): array
+    protected static function mainMenu($lang): array
     {
+        
         return [
             'keyboard' => [
                 [['text' => '📤 Yangi murojaat yuborish'], ['text' => '📋 Mening murojaatlarim']],
