@@ -11,7 +11,6 @@ use App\Services\FunctionService;
 class TelegramStepService
 {
     use Keyboards;
-    
     public static function getStep($telegramId)
     {
         return TelegramUserStep::firstOrCreate([
@@ -54,8 +53,9 @@ class TelegramStepService
                         "new_lang" => "Til yangilandi ✅",
                     ],
                     "please" => "Iltimos menyudan tini tanlang",
-                    "no_murojat" => "Sizda hali murojaatlar yo‘q.",
                     "mymr" => "🗂 Mening murojaatlarim (so‘nggi 5):\n\n",
+                    "snd_phone" => "📞 Iltimos telefon raqamingizni yuboring yoki tugma orqali jo‘nating:",
+                    "txt_phone" => "📱 Telefon raqamni yuborish"
                 ];
             }else{
                 $lang = [
@@ -70,7 +70,7 @@ class TelegramStepService
                         "yangi" => "📤 Отправить новое обращение",
                         "new_appeal" => "Отправьте ваше обращение:",
                         "myMr" => "📋 Мои обращения",
-                        "settings" => "⚙️ Настройки:",
+                        "settings" => "⚙️ Настройки",
                         "no" => "Пожалуйста, выберите из меню:",
                         "yes" => "✅ Ваше обращение принято!",
                         "null" => "У вас пока нет обращений.",
@@ -81,8 +81,9 @@ class TelegramStepService
                         "new_lang" => "Язык успешно изменён ✅",
                     ],
                     "please" => "Пожалуйста, выберите язык из меню.",
-                    "no_murojat" => "У вас пока нет обращений.",
                     "mymr" => "🗂 Мои обращения (последние 5):\n\n",
+                    "snd_phone" => "📞 Пожалуйста, отправьте свой номер телефона или отправьте через кнопку:",
+                    "txt_phone" => "📱 Отправить номер телефона"
                 ];
             }
             switch ($step) {
@@ -151,7 +152,7 @@ class TelegramStepService
                                     $user->birth_date = $text;
                                     $user->save();
                                     self::setStep($telegramId, "phone");
-                                    self::sendContactRequest($telegramId);
+                                    self::sendContactRequest($telegramId, $lang);
                                     break;
                                     
                                     case "phone":
@@ -181,13 +182,13 @@ class TelegramStepService
                                                     self::setStep($telegramId, "new_appeal");
                                                     self::sendMessage($telegramId, $lang['main_menu']['new_appeal']);
                                                 } elseif ($text === $lang["main_menu"]["myMr"]) {
-                                                    self::listAppeals($telegramId, $user);
+                                                    self::listAppeals($telegramId, $user, $lang);
                                                 } elseif ($text === $lang['main_menu']['settings']) {
                                                     self::setStep($telegramId, "settings");
                                                     self::sendMessage(
                                                         $telegramId,
                                                         $lang['main_menu']['settings'],
-                                                        self::settingsMenu()
+                                                        self::settingsMenu($user->language)
                                                     );
                                                 } else {
                                                     self::sendMessage(
@@ -201,6 +202,12 @@ class TelegramStepService
                                                 /* ---------- YANGI MUROJAAT ﻿---------- */
                                                 case "new_appeal":
                                                     // matnni bazaga saqlash
+                                                    $arr = [$lang['main_menu']['new_appeal'], $lang['main_menu']['settings'],$lang['main_menu']['myMr'],];
+                                                    if(in_array($text,$arr)){
+                                                        self::setStep($telegramId, "new_appeal");
+                                                        self::sendMessage($telegramId, $lang['main_menu']['new_appeal']);
+                                                    return;
+                                                    }
                                                     $appeal = Appeal::create([
                                                         "user_id" => $user->id,
                                                         "body" => $text,
@@ -238,7 +245,7 @@ class TelegramStepService
                                                             self::sendMessage(
                                                                 $telegramId,
                                                                 $lang['main_menu']['no'],
-                                                                self::settingsMenu()
+                                                                self::settingsMenu($user->language)
                                                             );
                                                         }
                                                         break;
@@ -250,7 +257,7 @@ class TelegramStepService
                                                                 self::sendMessage(
                                                                     $telegramId,
                                                                     $lang['main_menu']['new_lang'],
-                                                                    self::settingsMenu()
+                                                                    self::settingsMenu($user->language)
                                                                 );
                                                                 self::setStep($telegramId, "settings");
                                                             } else {
@@ -298,7 +305,7 @@ class TelegramStepService
                                                             );
                                                         }
                                                         
-                                                        public static function sendContactRequest($chatId)
+                                                        public static function sendContactRequest($chatId, $lang)
                                                         {
                                                             Http::post(
                                                                 "https://api.telegram.org/bot" .
@@ -306,13 +313,12 @@ class TelegramStepService
                                                                 "/sendMessage",
                                                                 [
                                                                     "chat_id" => $chatId,
-                                                                    "text" =>
-                                                                    "📞 Iltimos telefon raqamingizni yuboring yoki tugma orqali jo‘nating:",
+                                                                    "text" => $lang['snd_phone'],
                                                                     "reply_markup" => json_encode([
                                                                         "keyboard" => [
                                                                             [
                                                                                 [
-                                                                                    "text" => "📱 Telefon raqamni yuborish",
+                                                                                    "text" => $lang['txt_phone'],
                                                                                     "request_contact" => true,
                                                                                 ],
                                                                             ],
@@ -323,7 +329,7 @@ class TelegramStepService
                                                                     ]
                                                                 );
                                                             }
-                                                            protected static function listAppeals($chatId, User $user): void
+                                                            protected static function listAppeals($chatId, User $user, $lang): void
                                                             {
                                                                 $appeals = $user
                                                                 ->appeals()
@@ -333,13 +339,13 @@ class TelegramStepService
                                                                 if ($appeals->isEmpty()) {
                                                                     self::sendMessage(
                                                                         $chatId,
-                                                                        "Sizda hali murojaatlar yo‘q.",
+                                                                        $lang['main_menu']['null'],
                                                                         self::mainMenu($user->language)
                                                                     );
                                                                     return;
                                                                 }
                                                                 
-                                                                $text = "🗂 Mening murojaatlarim (so‘nggi 5):\n\n";
+                                                                $text = $lang['mymr'];
                                                                 foreach ($appeals as $i => $app) {
                                                                     $text .=
                                                                     $i +
