@@ -7,7 +7,7 @@ use App\Models\AdminReplyState;
 use App\Models\AdminNotification;
 use App\Models\Appeal;
 use App\Models\User;
-
+use Illuminate\Support\Facades\DB;
 class FunctionService
 {
     public function startFunc($chatId)
