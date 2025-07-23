@@ -85,7 +85,7 @@ class FunctionService
             }
             
             // Qolgan holatlar: /admin, kutayotganlar va boshqalar
-            if ($msg && $msg->getText()) {
+            if ($msg) {
                 $text = $msg->getText();
                 if ($text === '/admin') {
                     TelegramStepService::sendMessage($adminId, 'Admin menyu:', self::adminMainMenu());
@@ -96,7 +96,7 @@ class FunctionService
                     $pend = DB::table('appeals')->where('status', 'pending')->count();
                     $total = $answered + $pend;
 
-                    $message = "📊 Statistika:\n";
+                    $message = "📊 Statistika: ";
                     $message .= "Jami: $total\n";
                     $message .= "✅ Javob berilgan: $answered\n";
                     $message .= "⏳ Javob berilmagan: $pend";
@@ -168,7 +168,7 @@ class FunctionService
         }
         
         
-        private function forwardToUser(
+      private function forwardToUser(
             \Telegram\Bot\Objects\Message $msg,
             int $toUserId,
             $callback,
@@ -177,13 +177,6 @@ class FunctionService
                 try {
                     $fromChat = $msg->getChat()->getId();
                     $messageId = $msg->getMessageId();
-                    
-                    if (!$msg->getText() && !$msg->getCaption()) {
-                        \Log::info("asdasdas",["asdas"=>"sdas"]);
-                        
-                        return;
-                    }
-                     \Log::info("asd",["asdas"=>"sdas"]);
                     $customTextOrCaption = $msg->getText() ?? $caption;
                     
                     $data = [
@@ -208,6 +201,8 @@ class FunctionService
                     \Log::error("Telegram xatolik: " . $e->getMessage());
                 }
             }
+
+
             
             
             private function finalizeReply(int $appealId): void
@@ -259,6 +254,12 @@ class FunctionService
                             User $user,
                             Appeal $appeal
                             ): void {
+                                if($user->username == ''){
+                                    $nme = $user->telegram_id;
+                                }else{
+                                    $nme = $user->username;
+                                }
+                                
                                 foreach (config("telegram.admins") as $adminId) {
                                     $response = Http::post(
                                         "https://api.telegram.org/bot" .
@@ -266,7 +267,7 @@ class FunctionService
                                         "/sendMessage",
                                         [
                                             "chat_id" => $adminId,
-                                            "text" => "🆕 Yangi murojaat #{$appeal->id}\n{$user->full_name} (@{$user->telegram_id})\n\n<i>{$appeal->body}</i>",
+                                            "text" => "🆕 Yangi murojaat #{$appeal->id}\n{$user->full_name} (@{$nme})\n\n<i>{$appeal->body}</i>",
                                             "parse_mode" => "HTML",
                                             "reply_markup" => json_encode(
                                                 [

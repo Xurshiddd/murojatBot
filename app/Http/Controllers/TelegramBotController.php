@@ -23,9 +23,7 @@ class TelegramBotController extends Controller
         
         // 2) Message obyektini topamiz (text xabar yoki callback ichidagi message)
         $message  = $update->getMessage() ?? $callback?->getMessage();
-        if (!$message) {
-            return;    // media/foto only
-        }
+        
         // --- TO‘G‘RI ID LAR ---
         $fromId = $callback?->getFrom()->getId()           // callback bo‘lsa admin foydalanuvchi
         ?? $message->getFrom()->getId();           // oddiy xabar bo‘lsa
@@ -50,21 +48,23 @@ class TelegramBotController extends Controller
         if ($text === '/start') {
             return $this->functionService->startFunc($chatId);
         }
+        $username = $update['message']['from']['username'] ?? '';
         if (in_array($text, ["O'zbekcha", 'Русский'])) {
             if(User::where('telegram_id', $chatId)->exists()){
-                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text]);
+                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text, 'username' => $username ?? ""]);
                 TelegramUserStep::updateOrCreate(
                 ["telegram_id" => $fromId],
                 ["step" => 'main_menu']
             );
             }else {
-                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text]);
+                User::updateOrCreate(['telegram_id' => $chatId], ['language' => $text, 'username' => $username ?? ""]);
                 TelegramUserStep::updateOrCreate(
                 ["telegram_id" => $fromId],
                 ["step" => 'first']
             );
             }
         }
+        User::where('telegram_id', $chatId)->update(['username' => $username ?? ""]);
         $this->functionService->registerFunc($chatId, $text);
     }
     
