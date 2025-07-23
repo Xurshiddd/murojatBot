@@ -91,7 +91,21 @@ class FunctionService
                     TelegramStepService::sendMessage($adminId, 'Admin menyu:', self::adminMainMenu());
                     return;
                 }
-                
+                if ($text === '/statistics') {
+                    $answered = DB::table('appeals')->where('status', 'answered')->count();
+                    $pend = DB::table('appeals')->where('status', 'pending')->count();
+                    $total = $answered + $pend;
+
+                    $message = "📊 Statistika:\n";
+                    $message .= "Jami: $total\n";
+                    $message .= "✅ Javob berilgan: $answered\n";
+                    $message .= "⏳ Javob berilmagan: $pend";
+
+                    TelegramStepService::sendMessage($adminId, $message, self::adminMainMenu());
+
+                    return;
+                }
+
                 if ($text === "/cancel") {
                     AdminReplyState::where('admin_id', $adminId)->delete();
                     TelegramStepService::sendMessage($adminId, "❌ Bekor qilindi.");
